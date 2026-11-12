@@ -11,6 +11,7 @@ try { require('fs').accessSync('.env'); require('dotenv').config(); } catch {}
 
 const express    = require('express');
 const cors       = require('cors');
+const helmet     = require('helmet');
 const morgan     = require('morgan');
 
 const pledgesRouter = require('./routes/pledges');
@@ -67,7 +68,29 @@ const corsOptions = {
     if (!allowedOrigins) return callback(null, true);
     // Check whitelist
     if (allowedOrigins.includes(origin)) return callback(null, true);
-    // Allow a5
-}
+    return callback(new Error('Origin is not allowed by CORS'));
+  },
+};
+
+app.use(cors(corsOptions));
+app.use(helmet());
+app.use(express.json({ limit: '1mb' }));
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+app.use(anonId);
+
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok' });
+});
+
+app.use('/api/pledges', pledgesRouter);
+app.use('/api/gemini', geminiRouter);
+app.use(errorHandler);
 
 module.exports = app; // exported for supertest
+
+if (require.main === module) {
+  const port = Number(process.env.PORT) || 5000;
+  app.listen(port, () => {
+    console.log(`✅  Backend listening on port ${port}`);
+  });
+}
