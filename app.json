@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "Start A New Life",
+    "slug": "start-a-new-life",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0E1A"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.startanewlife.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Used for Mirror Moment urge interrupt feature",
+        "NSPhotoLibraryUsageDescription": "Used to scan gallery for adult content"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A0E1A"
+      },
+      "package": "com.startanewlife.app",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output":  "single",
+      "name":    "Start A New Life",
+      "lang":    "en",
+      "backgroundColor": "#0A0E1A",
+      "themeColor": "#4A6FDB"
+    },
+    "plugins": [
+      ["expo-camera",       { "cameraPermission": "Allow Start A New Life to access camera for Mirror Moment" }],
+      ["expo-media-library",{ "photosPermission": "Allow Start A New Life to scan gallery for adult content"  }],
+      ["expo-notifications",{ "icon": "./assets/icon.png", "color": "#4A1FDB" }],
+      "expo-secure-store"
+    ],
+    "scheme": "startanewlife",
+    "extra": {
+      "eas": { "projectId": "your-eas-project-id" }
+    }
+  }
+}
