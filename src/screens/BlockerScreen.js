@@ -149,7 +149,7 @@ const BlockerScreen = () => {
     setGalleryScanning(true);
     setGalleryScanResult(null);
     try {
-      const permission = await MediaLibrary.requestPermissionsAsync();
+      const permission = await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
       if (!permission.granted) {
         Alert.alert('Permission needed', 'Allow photo access to count items in your library.');
         return;
@@ -162,7 +162,7 @@ const BlockerScreen = () => {
       setGalleryScanResult({ scanned: result.totalCount });
     } catch (error) {
       console.warn('Gallery item count failed:', error);
-      Alert.alert('Could not check gallery', 'Please try again later.');
+      Alert.alert('Could not check gallery', error.message || 'Please try again later.');
     } finally {
       setGalleryScanning(false);
     }
