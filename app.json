@@ -11,7 +11,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#0A0E1A"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.startanewlife.app",
@@ -32,24 +34,49 @@
         "WRITE_EXTERNAL_STORAGE",
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro",
-      "output":  "single",
-      "name":    "Start A New Life",
-      "lang":    "en",
+      "output": "single",
+      "name": "Start A New Life",
+      "lang": "en",
       "backgroundColor": "#0A0E1A",
       "themeColor": "#4A6FDB"
     },
     "plugins": [
-      ["expo-camera",       { "cameraPermission": "Allow Start A New Life to access camera for Mirror Moment" }],
-      ["expo-media-library",{ "photosPermission": "Allow Start A New Life to scan gallery for adult content"  }],
-      ["expo-notifications",{ "icon": "./assets/icon.png", "color": "#4A1FDB" }],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Start A New Life to access camera for Mirror Moment"
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow Start A New Life to scan gallery for adult content"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#4A1FDB"
+        }
+      ],
       "expo-secure-store"
     ],
-    "scheme": "startanewlife"
+    "scheme": "startanewlife",
+    "extra": {
+      "eas": {
+        "projectId": "78969981-21ba-4e3d-acf9-266f79ce6223"
+      }
+    }
   }
 }

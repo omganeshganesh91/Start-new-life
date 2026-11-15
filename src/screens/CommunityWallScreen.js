@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // CommunityWallScreen.js — Anonymous pledge wall + accountability
-// Uses ApiService (Node.js + SQLite REST backend) — no Firebase
+// Uses ApiService (Neon-backed REST API) — no Firebase
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useRef } from 'react';
 import {

@@ -22,7 +22,6 @@ const { redisCache } = require('../middleware/redisCache');
 const router = express.Router();
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_URL     =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent';
 
@@ -45,7 +44,8 @@ const DEFAULT_SAFETY_SETTINGS = [
 // Only 200 responses reach res.json() — so only they get cached by the
 // redisCache middleware that patched res.json.
 const proxyToGemini = async (req, res, next) => {
-  if (!GEMINI_API_KEY || GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY_HERE') {
+  const apiKey = process.env.GEMINI_API_KEY || '';
+  if (!apiKey || apiKey === 'YOUR_GEMINI_API_KEY_HERE') {
     return res.status(503).json({ error: 'Gemini API key not configured on server' });
   }
 
@@ -56,7 +56,7 @@ const proxyToGemini = async (req, res, next) => {
   }
 
   try {
-    const upstream = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
+    const upstream = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

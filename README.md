@@ -2,7 +2,7 @@
 
 A React Native (Expo SDK 51) recovery support app — streak tracking, community wall, blocker, daily motivation via Gemini AI.
 
-**Tech stack:** React Native · Expo SDK 51 · Redux Toolkit · Node.js · SQLite · Axios · expo-notifications
+**Tech stack:** React Native · Expo SDK 51 · Redux Toolkit · Node.js · Neon PostgreSQL · Axios · expo-notifications
 
 ---
 
@@ -27,12 +27,15 @@ Copy-Item .env.example .env
 ```bash
 cd backend
 npm install
-# Copy .env.example to .env and set GEMINI_API_KEY on the backend only.
+# Copy .env.example to .env and set DATABASE_URL and GEMINI_API_KEY on the backend only.
 npm start       # starts on http://localhost:5000
 ```
 
 The Gemini API key belongs in `backend/.env`; never put it in the Expo app's
 public environment variables. Redis is optional and the backend runs without it.
+Set `DATABASE_URL` to your Neon connection string in `backend/.env` and in the
+backend's Vercel environment variables. Run `npm run migrate` from `backend/`
+once to create the PostgreSQL tables.
 
 ---
 
@@ -117,7 +120,7 @@ cd backend
 npm start          # production
 npm run dev        # dev with auto-reload (nodemon)
 npm test           # run integration tests
-node db/migrate.js # run DB migrations manually (auto-runs on start)
+npm run migrate    # create/update Neon PostgreSQL tables
 ```
 
 Backend endpoints:
@@ -142,7 +145,7 @@ Backend endpoints:
 # Expo app tests
 npm test
 
-# Backend integration tests
+# Backend API tests
 cd backend && npm test
 ```
 
@@ -165,7 +168,7 @@ StartANewLife/
 │   │   ├── BlockerScreen.js      # DNS setup guide + private gallery item count
 │   │   └── AppLockScreen.js      # Focus timer + app-avoidance preferences
 │   ├── services/
-│   │   ├── ApiService.js         # REST client → Node.js+SQLite backend ✅
+│   │   ├── ApiService.js         # REST client → Neon-backed Node.js API ✅
 │   │   ├── GeminiService.js      # Gemini AI free tier (1500 req/day)
 │   │   ├── NotificationService.js# expo-notifications local push ✅
 │   │   └── FirebaseService.js    # ⛔ DEPRECATED tombstone (Firebase removed)
@@ -180,10 +183,10 @@ StartANewLife/
 │       ├── responsive.js         # hs/vs/ms/wp/hp — responsive for all screen sizes
 │       ├── dateUtils.js          # Streak calculation helpers
 │       └── encryption.js        # expo-secure-store helpers
-├── backend/                      # Node.js + SQLite backend
+├── backend/                      # Node.js + Neon PostgreSQL backend
 │   ├── server.js                 # Express app entry point
 │   ├── db/
-│   │   ├── index.js              # SQLite connection singleton (better-sqlite3)
+│   │   ├── index.js              # Neon PostgreSQL connection pool
 │   │   └── migrate.js            # Schema migration script
 │   ├── routes/
 │   │   └── pledges.js            # /api/pledges router
@@ -211,7 +214,7 @@ StartANewLife/
 
 ---
 
-## 🔥 What changed (Firebase → Node.js + SQLite)
+## 🔥 What changed (Firebase → Node.js + Neon PostgreSQL)
 
 | Before | After |
 |---|---|

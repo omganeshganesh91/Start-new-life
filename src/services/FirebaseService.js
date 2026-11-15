@@ -2,7 +2,7 @@
 // FirebaseService.js — DEPRECATED — Firebase has been removed from this project
 //
 // All Firebase (Firestore + Auth + FCM) functionality has been replaced:
-//   • Community Wall pledges  → src/services/ApiService.js  (Node.js + SQLite REST)
+//   • Community Wall pledges  → src/services/ApiService.js  (Neon-backed REST API)
 //   • Push notifications      → src/services/NotificationService.js (expo-notifications)
 //
 // This file is kept as a tombstone so any missed import fails with a clear message.

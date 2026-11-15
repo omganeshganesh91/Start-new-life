@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// server.js — Start A New Life — Node.js + Express + SQLite backend
+// server.js — Start A New Life — Node.js + Express + Neon PostgreSQL backend
 //
 // Start:   node server.js
 // Dev:     nodemon server.js
@@ -19,15 +19,7 @@ const geminiRouter  = require('./routes/gemini');
 const anonId        = require('./middleware/anonId');
 const errorHandler  = require('./middleware/errorHandler');
 
-// ── Bootstrap SQLite (auto-creates schema on first start) ─────────────────────
 const { getDb } = require('./db');
-try {
-  getDb();
-  console.log('✅  SQLite database ready');
-} catch (err) {
-  console.error('❌  Database init failed:', err.message);
-  process.exit(1);
-}
 
 // ── Express app ───────────────────────────────────────────────────────────────
 const app = express();
@@ -78,8 +70,14 @@ app.use(express.json({ limit: '1mb' }));
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(anonId);
 
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok' });
+app.get('/health', async (_req, res) => {
+  try {
+    await getDb().query('SELECT 1');
+    return res.json({ status: 'ok' });
+  } catch (err) {
+    console.error('Health check database error:', err);
+    return res.status(503).json({ status: 'error', error: 'Database unavailable' });
+  }
 });
 
 app.use('/api/pledges', pledgesRouter);

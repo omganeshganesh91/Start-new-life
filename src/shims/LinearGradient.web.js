@@ -10,7 +10,7 @@ import { View } from 'react-native';
  * Matches the expo-linear-gradient API surface:
  *   colors, start, end, locations, style, children, ...rest
  */
-const LinearGradient = ({
+export const LinearGradient = ({
   colors = ['#000', '#fff'],
   start  = { x: 0, y: 0 },
   end    = { x: 0, y: 1 },

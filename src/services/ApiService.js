@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// ApiService.js — REST client for the Node.js + SQLite backend
+// ApiService.js — REST client for the Neon-backed Node.js API
 // Replaces FirebaseService.js — same public API surface for easy swap
 // Backend base URL comes from EXPO_PUBLIC_API_URL in .env
 // ─────────────────────────────────────────────────────────────────────────────

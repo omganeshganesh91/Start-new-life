@@ -1,49 +1,39 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// db/migrate.js — Create / migrate SQLite schema
-// Run: node db/migrate.js
-// Safe to re-run (uses IF NOT EXISTS + ALTER TABLE migrations table)
-// ─────────────────────────────────────────────────────────────────────────────
-const Database = require('better-sqlite3');
-const path     = require('path');
-const fs       = require('fs');
+'use strict';
 
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'sanl.db');
+require('dotenv').config();
+const { closeDb, getDb } = require('./index');
 
-// Ensure data directory exists
-fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+async function migrate() {
+  const db = getDb();
 
-const db = new Database(DB_PATH);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS pledges (
+      id           TEXT PRIMARY KEY DEFAULT (gen_random_uuid()::text),
+      uid          TEXT NOT NULL,
+      display_name TEXT NOT NULL DEFAULT 'Warrior',
+      message      TEXT NOT NULL,
+      streak       INTEGER NOT NULL DEFAULT 0,
+      hearts       INTEGER NOT NULL DEFAULT 0,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
 
-// Enable WAL mode for better concurrent read performance
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS pledge_hearts (
+      pledge_id TEXT NOT NULL REFERENCES pledges(id) ON DELETE CASCADE,
+      uid       TEXT NOT NULL,
+      PRIMARY KEY (pledge_id, uid)
+    )
+  `);
 
-// ── Schema ────────────────────────────────────────────────────────────────────
-const SCHEMA = `
-  -- Pledges posted to The Wall
-  CREATE TABLE IF NOT EXISTS pledges (
-    id           TEXT     PRIMARY KEY DEFAULT (lower(hex(randomblob(8)))),
-    uid          TEXT     NOT NULL,                   -- anonymous device ID
-    display_name TEXT     NOT NULL DEFAULT 'Warrior',
-    message      TEXT     NOT NULL,
-    streak       INTEGER  NOT NULL DEFAULT 0,
-    hearts       INTEGER  NOT NULL DEFAULT 0,
-    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-  );
+  await db.query('CREATE INDEX IF NOT EXISTS idx_pledges_created_at ON pledges (created_at DESC)');
+  await db.query('CREATE INDEX IF NOT EXISTS idx_pledges_uid ON pledges (uid)');
+  console.log('Neon PostgreSQL schema migrated successfully');
+}
 
-  -- Hearts (uid can heart each pledge once)
-  CREATE TABLE IF NOT EXISTS pledge_hearts (
-    pledge_id TEXT NOT NULL REFERENCES pledges(id) ON DELETE CASCADE,
-    uid       TEXT NOT NULL,
-    PRIMARY KEY (pledge_id, uid)
-  );
-
-  -- Indexes for common query patterns
-  CREATE INDEX IF NOT EXISTS idx_pledges_created_at ON pledges (created_at DESC);
-  CREATE INDEX IF NOT EXISTS idx_pledges_uid        ON pledges (uid);
-`;
-
-db.exec(SCHEMA);
-
-console.log('✅  SQLite schema migrated successfully:', DB_PATH);
-db.close();
+migrate()
+  .catch((err) => {
+    console.error('Database migration failed:', err);
+    process.exitCode = 1;
+  })
+  .finally(closeDb);

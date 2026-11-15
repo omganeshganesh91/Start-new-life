@@ -12,30 +12,31 @@ const MAX_PLEDGES_PER_PAGE = 50;
  * Query params: limit (default 20, max 50), offset (default 0)
  * Attaches `hearted: boolean` for the requesting uid.
  */
-const listPledges = (req, res) => {
+const listPledges = async (req, res) => {
   try {
     const db     = getDb();
     const uid    = req.anonId;
     const limit  = Math.min(parseInt(req.query.limit  || '20', 10), MAX_PLEDGES_PER_PAGE);
     const offset = Math.max(parseInt(req.query.offset || '0',  10), 0);
 
-    const rows = db.prepare(`
+    const { rows } = await db.query(`
       SELECT
         p.id,
         p.uid,
-        p.display_name AS displayName,
+        p.display_name AS "displayName",
         p.message,
         p.streak,
         p.hearts,
-        p.created_at   AS createdAt,
-        CASE WHEN h.uid IS NOT NULL THEN 1 ELSE 0 END AS hearted
+        p.created_at   AS "createdAt",
+        CASE WHEN h.uid IS NOT NULL THEN TRUE ELSE FALSE END AS hearted
       FROM pledges p
-      LEFT JOIN pledge_hearts h ON h.pledge_id = p.id AND h.uid = ?
+      LEFT JOIN pledge_hearts h ON h.pledge_id = p.id AND h.uid = $1
       ORDER BY p.created_at DESC
-      LIMIT ? OFFSET ?
-    `).all(uid, limit, offset);
+      LIMIT $2 OFFSET $3
+    `, [uid, limit, offset]);
 
-    const total = db.prepare('SELECT COUNT(*) AS n FROM pledges').get().n;
+    const countResult = await db.query('SELECT COUNT(*) AS n FROM pledges');
+    const total = Number(countResult.rows[0].n);
 
     return res.json({
       pledges: rows.map(normalise),
@@ -55,9 +56,8 @@ const listPledges = (req, res) => {
  * Body: { message, streak, displayName }
  * Header: x-anon-id (set by middleware)
  */
-const createPledge = (req, res) => {
+const createPledge = async (req, res) => {
   try {
-    const db  = getDb();
     const uid = req.anonId;
 
     const { message, streak, displayName } = req.body;
@@ -75,17 +75,24 @@ const createPledge = (req, res) => {
     const safeDisplayName = typeof displayName === 'string' && displayName.trim()
       ? displayName.trim().slice(0, 50)
       : generateAnonymousName();
+    const db = getDb();
 
     // Insert
-    const id = db.prepare(`
+    const { rows } = await db.query(`
       INSERT INTO pledges (uid, display_name, message, streak)
-      VALUES (?, ?, ?, ?)
-    `).run(uid, safeDisplayName, trimmed, safeStreak).lastInsertRowid;
+      VALUES ($1, $2, $3, $4)
+      RETURNING
+        id,
+        uid,
+        display_name AS "displayName",
+        message,
+        streak,
+        hearts,
+        FALSE AS hearted,
+        created_at AS "createdAt"
+    `, [uid, safeDisplayName, trimmed, safeStreak]);
 
-    // Fetch the inserted row to return
-    const row = db.prepare('SELECT * FROM pledges WHERE rowid = ?').get(id);
-
-    return res.status(201).json(normalise(row));
+    return res.status(201).json(normalise(rows[0]));
   } catch (err) {
     console.error('createPledge error:', err);
     return res.status(500).json({ error: 'Failed to create pledge' });
@@ -96,44 +103,75 @@ const createPledge = (req, res) => {
 /**
  * Toggle heart on a pledge. Returns { hearted: boolean, hearts: number }.
  */
-const toggleHeart = (req, res) => {
+const toggleHeart = async (req, res) => {
+  let client;
+  let transactionStarted = false;
+
   try {
     const db        = getDb();
     const uid       = req.anonId;
     const pledgeId  = req.params.id;
+    client = await db.connect();
 
-    // Check pledge exists
-    const pledge = db.prepare('SELECT id, hearts FROM pledges WHERE id = ?').get(pledgeId);
-    if (!pledge) {
+    await client.query('BEGIN');
+    transactionStarted = true;
+
+    const pledge = await client.query(
+      'SELECT id FROM pledges WHERE id = $1 FOR UPDATE',
+      [pledgeId]
+    );
+    if (pledge.rowCount === 0) {
+      await client.query('ROLLBACK');
+      transactionStarted = false;
       return res.status(404).json({ error: 'Pledge not found' });
     }
 
-    // Check existing heart
-    const existing = db.prepare(
-      'SELECT 1 FROM pledge_hearts WHERE pledge_id = ? AND uid = ?'
-    ).get(pledgeId, uid);
+    const existing = await client.query(
+      'SELECT 1 FROM pledge_hearts WHERE pledge_id = $1 AND uid = $2',
+      [pledgeId, uid]
+    );
 
-    const toggle = db.transaction(() => {
-      if (existing) {
-        // Remove heart
-        db.prepare('DELETE FROM pledge_hearts WHERE pledge_id = ? AND uid = ?').run(pledgeId, uid);
-        db.prepare('UPDATE pledges SET hearts = MAX(hearts - 1, 0) WHERE id = ?').run(pledgeId);
-        return false;
-      } else {
-        // Add heart
-        db.prepare('INSERT OR IGNORE INTO pledge_hearts (pledge_id, uid) VALUES (?, ?)').run(pledgeId, uid);
-        db.prepare('UPDATE pledges SET hearts = hearts + 1 WHERE id = ?').run(pledgeId);
-        return true;
-      }
-    });
+    const hearted = existing.rowCount === 0;
+    if (hearted) {
+      await client.query(
+        'INSERT INTO pledge_hearts (pledge_id, uid) VALUES ($1, $2)',
+        [pledgeId, uid]
+      );
+      await client.query(
+        'UPDATE pledges SET hearts = hearts + 1 WHERE id = $1',
+        [pledgeId]
+      );
+    } else {
+      await client.query(
+        'DELETE FROM pledge_hearts WHERE pledge_id = $1 AND uid = $2',
+        [pledgeId, uid]
+      );
+      await client.query(
+        'UPDATE pledges SET hearts = GREATEST(hearts - 1, 0) WHERE id = $1',
+        [pledgeId]
+      );
+    }
 
-    const hearted = toggle();
-    const updated = db.prepare('SELECT hearts FROM pledges WHERE id = ?').get(pledgeId);
+    const updated = await client.query(
+      'SELECT hearts FROM pledges WHERE id = $1',
+      [pledgeId]
+    );
+    await client.query('COMMIT');
+    transactionStarted = false;
 
-    return res.json({ hearted, hearts: updated.hearts });
+    return res.json({ hearted, hearts: updated.rows[0].hearts });
   } catch (err) {
+    if (client && transactionStarted) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError) {
+        console.error('toggleHeart rollback error:', rollbackError);
+      }
+    }
     console.error('toggleHeart error:', err);
     return res.status(500).json({ error: 'Failed to toggle heart' });
+  } finally {
+    if (client) client.release();
   }
 };
 
@@ -141,21 +179,24 @@ const toggleHeart = (req, res) => {
 /**
  * Delete own pledge. Only the posting uid may delete.
  */
-const deletePledge = (req, res) => {
+const deletePledge = async (req, res) => {
   try {
     const db       = getDb();
     const uid      = req.anonId;
     const pledgeId = req.params.id;
 
-    const pledge = db.prepare('SELECT uid FROM pledges WHERE id = ?').get(pledgeId);
-    if (!pledge) {
+    const pledge = await db.query(
+      'SELECT uid FROM pledges WHERE id = $1',
+      [pledgeId]
+    );
+    if (pledge.rowCount === 0) {
       return res.status(404).json({ error: 'Pledge not found' });
     }
-    if (pledge.uid !== uid) {
+    if (pledge.rows[0].uid !== uid) {
       return res.status(403).json({ error: 'You can only delete your own pledges' });
     }
 
-    db.prepare('DELETE FROM pledges WHERE id = ?').run(pledgeId);
+    await db.query('DELETE FROM pledges WHERE id = $1', [pledgeId]);
     return res.json({ deleted: true });
   } catch (err) {
     console.error('deletePledge error:', err);
