@@ -50,9 +50,6 @@
       ["expo-notifications",{ "icon": "./assets/icon.png", "color": "#4A1FDB" }],
       "expo-secure-store"
     ],
-    "scheme": "startanewlife",
-    "extra": {
-      "eas": { "projectId": "your-eas-project-id" }
-    }
+    "scheme": "startanewlife"
   }
 }
