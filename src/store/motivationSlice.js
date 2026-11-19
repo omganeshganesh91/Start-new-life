@@ -5,19 +5,19 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { fetchDailyMotivation, getFallbackMotivation } from '../services/GeminiService';
 
 const DEFAULT_STATE = {
-  quote:       '',
-  explanation: '',
-  action:      '',
-  imageUrl:    '',
-  imageTag:    '',
+  ...getFallbackMotivation(),
   loading:     false,
   error:       null,
   lastFetched: null,
 };
 
-export const fetchMotivation = createAsyncThunk('motivation/fetch', async () => {
-  return await fetchDailyMotivation();
-});
+export const fetchMotivation = createAsyncThunk(
+  'motivation/fetch',
+  async () => fetchDailyMotivation(),
+  {
+    condition: (_arg, { getState }) => !getState().motivation.loading,
+  }
+);
 
 const motivationSlice = createSlice({
   name: 'motivation',

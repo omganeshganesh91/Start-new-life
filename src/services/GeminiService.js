@@ -13,19 +13,32 @@ const API_BASE = (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000').re
 
 // ── Core fetch — calls the backend proxy ─────────────────────────────────────
 const callGemini = async (prompt, endpoint = 'generate') => {
-  const response = await fetch(`${API_BASE}/api/gemini/${endpoint}`, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ prompt }),
-  });
+  const startedAt = Date.now();
+  console.info(`[Gemini] ${endpoint} request started`);
+  let response;
+  try {
+    response = await fetch(`${API_BASE}/api/gemini/${endpoint}`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ prompt }),
+    });
+  } catch (error) {
+    console.warn(`[Gemini] ${endpoint} network failure durationMs=${Date.now() - startedAt}: ${error.message}`);
+    throw error;
+  }
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err?.error || `Gemini proxy HTTP ${response.status}`);
+    const message = err?.error || `Gemini proxy HTTP ${response.status}`;
+    console.warn(
+      `[Gemini] ${endpoint} failed status=${response.status} durationMs=${Date.now() - startedAt}: ${message}`
+    );
+    throw new Error(message);
   }
 
   const data = await response.json();
   if (!data?.text) throw new Error('Empty Gemini response');
+  console.info(`[Gemini] ${endpoint} completed status=${response.status} durationMs=${Date.now() - startedAt}`);
   return data.text;
 };
 

@@ -36,18 +36,17 @@ const MotivationCard = ({
     }
   };
 
-  if (loading) {
-    return (
-      <View style={[styles.card, styles.loadingCard]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Fetching your daily wisdom...</Text>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.wrapper}>
-      <Text style={styles.sectionLabel}>✨ Today's Motivation</Text>
+      <View style={styles.heading}>
+        <Text style={styles.sectionLabel}>✨ Today's Motivation</Text>
+        {loading && (
+          <View style={styles.refreshing}>
+            <ActivityIndicator size="small" color={COLORS.primary} />
+            <Text style={styles.refreshingText}>Updating</Text>
+          </View>
+        )}
+      </View>
 
       <View style={styles.card}>
         {/* Background image */}
@@ -125,15 +124,19 @@ const styles = StyleSheet.create({
     shadowOpacity:   0.4,
     shadowRadius:    8,
   },
-  loadingCard: {
-    alignItems:     'center',
-    justifyContent: 'center',
-    padding:        SPACING.xl,
-    gap:            SPACING.md,
+  heading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  loadingText: {
-    color:    COLORS.textMuted,
-    fontSize: FONTS.sizes.sm,
+  refreshing: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  refreshingText: {
+    color: COLORS.textMuted,
+    fontSize: FONTS.sizes.xs,
   },
   image: {
     position: 'absolute',

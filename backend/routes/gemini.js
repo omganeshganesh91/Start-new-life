@@ -26,6 +26,7 @@ const GEMINI_URL     =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent';
 const FALLBACK_GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent';
+const GEMINI_REQUEST_TIMEOUT_MS = 15000;
 
 const DEFAULT_GENERATION_CONFIG = {
   temperature:     0.85,
@@ -61,6 +62,7 @@ const proxyToGemini = async (req, res, next) => {
     const requestOptions = {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(GEMINI_REQUEST_TIMEOUT_MS),
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt.trim() }] }],
         generationConfig: { ...DEFAULT_GENERATION_CONFIG, ...generationConfig },
@@ -68,15 +70,34 @@ const proxyToGemini = async (req, res, next) => {
       }),
     };
 
-    let upstream = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, requestOptions);
-    let data = await upstream.json();
+    const requestStartedAt = Date.now();
+    console.info(`[Gemini] ${req.method} ${req.path} started`);
+    const requestModel = async (modelUrl, modelName) => {
+      const modelStartedAt = Date.now();
+      console.info(`[Gemini] ${req.path} calling ${modelName}`);
+      try {
+        const response = await fetch(`${modelUrl}?key=${encodeURIComponent(apiKey)}`, requestOptions);
+        const responseData = await response.json();
+        console.info(
+          `[Gemini] ${req.path} ${modelName} status=${response.status} durationMs=${Date.now() - modelStartedAt}`
+        );
+        return { response, responseData };
+      } catch (error) {
+        console.warn(
+          `[Gemini] ${req.path} ${modelName} failed durationMs=${Date.now() - modelStartedAt}: ${error.message}`
+        );
+        throw error;
+      }
+    };
+
+    let { response: upstream, responseData: data } = await requestModel(GEMINI_URL, 'gemini-3.8-flash');
 
     if (upstream.status === 503) {
-      upstream = await fetch(
-        `${FALLBACK_GEMINI_URL}?key=${encodeURIComponent(apiKey)}`,
-        requestOptions
-      );
-      data = await upstream.json();
+      console.warn(`[Gemini] ${req.path} primary model overloaded; trying gemini-3.6-flash`);
+      ({ response: upstream, responseData: data } = await requestModel(
+        FALLBACK_GEMINI_URL,
+        'gemini-3.6-flash'
+      ));
     }
 
     // ── Only 200 → cached by redisCache middleware via patched res.json ────────
@@ -90,11 +111,15 @@ const proxyToGemini = async (req, res, next) => {
         });
       }
       // This is the ONLY path that triggers the Redis SET in redisCache
+      console.info(`[Gemini] ${req.path} completed durationMs=${Date.now() - requestStartedAt}`);
       return res.status(200).json({ text: rawText });
     }
 
     // ── Non-200 from Gemini — forward status, do NOT cache ────────────────────
-    console.warn(`[Gemini] upstream ${upstream.status}:`, data?.error?.message || data);
+    console.warn(
+      `[Gemini] ${req.path} failed status=${upstream.status} durationMs=${Date.now() - requestStartedAt}:`,
+      data?.error?.message || data
+    );
     return res.status(upstream.status).json({
       error:  data?.error?.message || `Gemini error ${upstream.status}`,
       status: upstream.status,
