@@ -1,11 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// GeminiService.js — Gemini 3.8 Flash AI integration via backend proxy
+// GeminiService.js — database-backed inspiration quotes and Gemini AI features
 // All requests go through the Express backend which:
 //   • Keeps the API key server-side (never in the client bundle)
 //   • Caches 200 responses in Redis automatically
 // ─────────────────────────────────────────────────────────────────────────────
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { STORAGE_KEYS, GEMINI_PROMPTS, UNSPLASH_THEMES } from '../utils/constants';
+import { GEMINI_PROMPTS } from '../utils/constants';
 
 // Backend base URL — set EXPO_PUBLIC_API_URL in .env
 // e.g. http://localhost:5000  or  https://your-app.railway.app
@@ -48,35 +47,31 @@ const parseGeminiJSON = (raw) => {
   return JSON.parse(cleaned);
 };
 
-// ── 1. Daily Motivation (cached per day) ─────────────────────────────────────
+// ── 1. Daily Motivation (random quote from the backend database) ──────────────
 export const fetchDailyMotivation = async () => {
   try {
-    // Serve from cache if already fetched today
-    const cached = await AsyncStorage.getItem(STORAGE_KEYS.lastMotivation);
-    if (cached) {
-      const { date, data } = JSON.parse(cached);
-      if (date === new Date().toDateString()) return { ...data, fromCache: true };
+    const startedAt = Date.now();
+    console.info('[Quotes] random quote request started');
+    const response = await fetch(`${API_BASE}/api/quotes/random`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error?.error || `Quotes API HTTP ${response.status}`);
     }
 
-    const rawText = await callGemini(GEMINI_PROMPTS.dailyMotivation, 'motivation');
-    const parsed  = parseGeminiJSON(rawText);
+    const data = await response.json();
+    if (!data?.quote || typeof data.quote !== 'string') {
+      throw new Error('Quotes API returned an invalid quote');
+    }
 
-    const theme  = UNSPLASH_THEMES[Math.floor(Math.random() * UNSPLASH_THEMES.length)];
-    const result = {
-      quote:       parsed.quote       || 'Every moment clean is a victory.',
-      explanation: parsed.explanation || 'You are stronger than any urge.',
-      action:      parsed.action      || 'Take one deep breath right now.',
-      imageUrl:    `https://source.unsplash.com/800x600/?${theme}&t=${Date.now()}`,
-      imageTag:    theme,
-      fetchedAt:   new Date().toISOString(),
+    console.info(`[Quotes] random quote received durationMs=${Date.now() - startedAt}`);
+    return {
+      ...getFallbackMotivation(),
+      quote: data.quote,
+      category: data.category,
+      explanation: '',
+      action: '',
+      fetchedAt: new Date().toISOString(),
     };
-
-    await AsyncStorage.setItem(
-      STORAGE_KEYS.lastMotivation,
-      JSON.stringify({ date: new Date().toDateString(), data: result })
-    );
-
-    return result;
   } catch (error) {
     console.warn('GeminiService.fetchDailyMotivation:', error.message);
     return getFallbackMotivation();

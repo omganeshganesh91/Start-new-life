@@ -71,25 +71,25 @@ describe('fetchDailyMotivation (offline/fallback)', () => {
   });
 });
 
-// ── fetchDailyMotivation — returns cached data ────────────────────────────────
-describe('fetchDailyMotivation (cache hit)', () => {
-  const AsyncStorage = require('@react-native-async-storage/async-storage');
+// ── fetchDailyMotivation — fetches a fresh database quote ─────────────────────
+describe('fetchDailyMotivation (database quotes)', () => {
+  test('requests a new quote from the backend on each call', async () => {
+    const makeResponse = (quote) => ({
+      ok: true,
+      json: async () => ({ quote, category: 'learning' }),
+    });
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce(makeResponse('Ask one more question.'))
+      .mockResolvedValueOnce(makeResponse('Practice a new skill today.'));
 
-  test('returns cached data if saved today', async () => {
-    const cachedData = {
-      quote:       'Cached quote',
-      explanation: 'Cached explanation',
-      action:      'Cached action',
-      imageUrl:    'https://example.com/img.jpg',
-      imageTag:    'mountain',
-    };
-    AsyncStorage.getItem.mockResolvedValueOnce(
-      JSON.stringify({ date: new Date().toDateString(), data: cachedData })
-    );
+    const first = await fetchDailyMotivation();
+    const second = await fetchDailyMotivation();
 
-    const result = await fetchDailyMotivation();
-    expect(result.quote).toBe('Cached quote');
-    expect(result.fromCache).toBe(true);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(global.fetch.mock.calls[0][0]).toMatch(/\/api\/quotes\/random$/);
+    expect(first.quote).toBe('Ask one more question.');
+    expect(first.category).toBe('learning');
+    expect(second.quote).toBe('Practice a new skill today.');
   });
 });
 

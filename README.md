@@ -35,7 +35,8 @@ The Gemini API key belongs in `backend/.env`; never put it in the Expo app's
 public environment variables. Redis is optional and the backend runs without it.
 Set `DATABASE_URL` to your Neon connection string in `backend/.env` and in the
 backend's Vercel environment variables. Run `npm run migrate` from `backend/`
-once to create the PostgreSQL tables.
+to create the PostgreSQL tables and seed the 5,000 motivational quotes from
+`backend/data/motivational_quotes.json`.
 
 ---
 
@@ -128,6 +129,7 @@ Backend endpoints:
 | Method | URL | Description |
 |---|---|---|
 | GET | `/health` | Health check |
+| GET | `/api/quotes/random` | Fetch a random motivational quote from Neon |
 | GET | `/api/pledges?limit=20&offset=0` | List pledges |
 | POST | `/api/pledges` | Create pledge |
 | POST | `/api/pledges/:id/heart` | Toggle heart |

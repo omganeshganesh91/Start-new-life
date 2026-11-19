@@ -15,6 +15,7 @@ const helmet     = require('helmet');
 const morgan     = require('morgan');
 
 const pledgesRouter = require('./routes/pledges');
+const quotesRouter   = require('./routes/quotes');
 const geminiRouter  = require('./routes/gemini');
 const anonId        = require('./middleware/anonId');
 const errorHandler  = require('./middleware/errorHandler');
@@ -81,6 +82,7 @@ app.get('/health', async (_req, res) => {
 });
 
 app.use('/api/pledges', pledgesRouter);
+app.use('/api/quotes', quotesRouter);
 app.use('/api/gemini', geminiRouter);
 app.use(errorHandler);
 
