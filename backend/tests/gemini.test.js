@@ -20,6 +20,8 @@ const app = require('../server');
 
 const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent';
+const FALLBACK_GEMINI_URL =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent';
 
 let fetchSpy;
 
@@ -116,6 +118,26 @@ describe('Gemini proxy', () => {
 
     expect(res.status).toBe(429);
     expect(res.body).toEqual({ error: 'Quota exceeded', status: 429 });
+  });
+
+  it('uses the fallback model when the primary model is overloaded', async () => {
+    fetchSpy
+      .mockResolvedValueOnce(upstreamResponse(503, {
+        error: { message: 'Model is experiencing high demand' },
+      }))
+      .mockResolvedValueOnce(upstreamResponse(200, {
+        candidates: [{ content: { parts: [{ text: 'Keep going.' }] } }],
+      }));
+
+    const res = await request(app)
+      .post('/api/gemini/generate')
+      .send({ prompt: 'Encourage me.' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ text: 'Keep going.' });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy.mock.calls[0][0]).toBe(`${GEMINI_URL}?key=unit-test-key`);
+    expect(fetchSpy.mock.calls[1][0]).toBe(`${FALLBACK_GEMINI_URL}?key=unit-test-key`);
   });
 
   it('returns 502 when Gemini succeeds without generated text', async () => {

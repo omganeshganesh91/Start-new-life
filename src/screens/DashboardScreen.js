@@ -4,7 +4,7 @@
 import React, { useEffect, useCallback, useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
-  TouchableOpacity, RefreshControl, StatusBar,
+  TouchableOpacity, RefreshControl, StatusBar, Platform,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -19,6 +19,7 @@ import { loadStreak, checkInToday } from '../store/streakSlice';
 import { loadCoins } from '../store/coinsSlice';
 import { COLORS, FONTS, SPACING, RADIUS, STORAGE_KEYS } from '../utils/constants';
 import { getTimeGreeting, isNightLockActive } from '../utils/dateUtils';
+import { cancelMoonNote, scheduleMoonNote } from '../services/NotificationService';
 
 const DashboardScreen = ({ navigation }) => {
   const dispatch   = useDispatch();
@@ -26,12 +27,21 @@ const DashboardScreen = ({ navigation }) => {
   const coins      = useSelector((s) => s.coins.balance);
   const motivation = useSelector((s) => s.motivation);
   const [refreshing, setRefreshing] = useState(false);
+  const [moonNoteEnabled, setMoonNoteEnabled] = useState(false);
+  const [moonNoteBusy, setMoonNoteBusy] = useState(false);
+  const [moonNoteMessage, setMoonNoteMessage] = useState('');
 
   useEffect(() => {
     dispatch(loadStreak());
     dispatch(loadCoins());
     dispatch(fetchMotivation());
   }, [dispatch]);
+
+  useEffect(() => {
+    AsyncStorage.getItem(STORAGE_KEYS.moonNoteEnabled)
+      .then((value) => setMoonNoteEnabled(value === 'true'))
+      .catch((error) => console.warn('Moon Note preference could not be loaded:', error));
+  }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -41,6 +51,41 @@ const DashboardScreen = ({ navigation }) => {
 
   const handleCheckIn = () => {
     dispatch(checkInToday());
+  };
+
+  const toggleMoonNote = async () => {
+    if (moonNoteBusy) return;
+
+    setMoonNoteBusy(true);
+    setMoonNoteMessage('');
+    try {
+      if (moonNoteEnabled) {
+        await cancelMoonNote();
+        await AsyncStorage.removeItem(STORAGE_KEYS.moonNoteEnabled);
+        setMoonNoteEnabled(false);
+        setMoonNoteMessage('Moon Note is paused.');
+      } else {
+        const scheduled = await scheduleMoonNote();
+        if (!scheduled) {
+          setMoonNoteMessage('Allow notifications on your phone to turn on Moon Note.');
+          return;
+        }
+
+        try {
+          await AsyncStorage.setItem(STORAGE_KEYS.moonNoteEnabled, 'true');
+        } catch (error) {
+          await cancelMoonNote();
+          throw error;
+        }
+        setMoonNoteEnabled(true);
+        setMoonNoteMessage('A quiet reflection will arrive at 9:30 PM.');
+      }
+    } catch (error) {
+      console.warn('Moon Note could not be updated:', error);
+      setMoonNoteMessage('Could not update Moon Note. Please try again.');
+    } finally {
+      setMoonNoteBusy(false);
+    }
   };
 
   const nightLock = isNightLockActive();
@@ -77,6 +122,36 @@ const DashboardScreen = ({ navigation }) => {
             <Text style={styles.nightBannerText}>
               🌙  Night reminder window — Stay strong. Sleep is recovery.
             </Text>
+          </View>
+        )}
+
+        {Platform.OS !== 'web' && (
+          <View style={styles.moonNoteCard}>
+            <View style={styles.moonNoteCopy}>
+              <Text style={styles.moonNoteTitle}>🌙  Moon Note</Text>
+              <Text style={styles.moonNoteDescription}>
+                A gentle, silent moment to celebrate one small win before quiet hours.
+              </Text>
+              <Text style={styles.moonNoteTime}>Daily at 9:30 PM · before Night Shield</Text>
+            </View>
+            <TouchableOpacity
+              onPress={toggleMoonNote}
+              disabled={moonNoteBusy}
+              style={[styles.moonNoteButton, moonNoteEnabled && styles.moonNoteButtonOn]}
+              activeOpacity={0.8}
+              accessibilityRole="switch"
+              accessibilityLabel="Moon Note evening reflection"
+              accessibilityState={{ checked: moonNoteEnabled, disabled: moonNoteBusy }}
+            >
+              <Text style={styles.moonNoteButtonText}>
+                {moonNoteBusy ? '…' : moonNoteEnabled ? 'On' : 'Set'}
+              </Text>
+            </TouchableOpacity>
+            {!!moonNoteMessage && (
+              <Text style={styles.moonNoteMessage} accessibilityLiveRegion="polite">
+                {moonNoteMessage}
+              </Text>
+            )}
           </View>
         )}
 
@@ -221,6 +296,64 @@ const styles = StyleSheet.create({
   nightBannerText: {
     color:    COLORS.textSecondary,
     fontSize: FONTS.sizes.sm,
+  },
+  moonNoteCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginHorizontal: SPACING.md,
+    marginVertical: SPACING.sm,
+    padding: SPACING.md,
+    borderRadius: RADIUS.lg,
+    backgroundColor: '#17152B',
+    borderWidth: 1,
+    borderColor: COLORS.accentPurple + '66',
+  },
+  moonNoteCopy: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: SPACING.sm,
+  },
+  moonNoteTitle: {
+    color: COLORS.textPrimary,
+    fontSize: FONTS.sizes.md,
+    fontWeight: FONTS.weights.bold,
+  },
+  moonNoteDescription: {
+    color: COLORS.textSecondary,
+    fontSize: FONTS.sizes.sm,
+    lineHeight: 18,
+    marginTop: SPACING.xs,
+  },
+  moonNoteTime: {
+    color: COLORS.primaryLight,
+    fontSize: FONTS.sizes.xs,
+    marginTop: SPACING.xs,
+  },
+  moonNoteButton: {
+    minWidth: 56,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.surfaceAlt,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  moonNoteButtonOn: {
+    backgroundColor: COLORS.accentPurple + '44',
+    borderColor: COLORS.accentPurple,
+  },
+  moonNoteButtonText: {
+    color: COLORS.textPrimary,
+    fontSize: FONTS.sizes.sm,
+    fontWeight: FONTS.weights.bold,
+  },
+  moonNoteMessage: {
+    flexBasis: '100%',
+    color: COLORS.textSecondary,
+    fontSize: FONTS.sizes.xs,
+    marginTop: SPACING.sm,
   },
   statusCard: {
     flexDirection:   'row',

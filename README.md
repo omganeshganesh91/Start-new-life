@@ -1,6 +1,6 @@
 # 🌱 Start A New Life
 
-A React Native (Expo SDK 51) recovery support app — streak tracking, community wall, blocker, daily motivation via Gemini AI.
+A React Native (Expo SDK 51) recovery support app — streak tracking, community wall, blocker, daily motivation via Gemini AI, and an optional quiet evening reflection reminder on mobile.
 
 **Tech stack:** React Native · Expo SDK 51 · Redux Toolkit · Node.js · Neon PostgreSQL · Axios · expo-notifications
 

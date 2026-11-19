@@ -3,7 +3,6 @@
 // Firebase Cloud Messaging removed — push delivery handled by backend if needed
 // ─────────────────────────────────────────────────────────────────────────────
 import * as Notifications from 'expo-notifications';
-import * as Device         from 'expo-device';
 import { Platform }        from 'react-native';
 
 // ── Default notification handler ──────────────────────────────────────────────
@@ -17,12 +16,6 @@ Notifications.setNotificationHandler({
 
 // ── Initialize & request permissions ─────────────────────────────────────────
 export const initNotifications = async () => {
-  if (!Device.isDevice) {
-    // Simulators cannot receive push notifications — skip permission request
-    console.log('NotificationService: skipping permission on simulator');
-    return false;
-  }
-
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
 
@@ -51,9 +44,55 @@ export const initNotifications = async () => {
       vibrationPattern: [],
       sound:       null,
     });
+
+    await Notifications.setNotificationChannelAsync('sanl-night-note', {
+      name:        'Moon Note',
+      importance:  Notifications.AndroidImportance.LOW,
+      vibrationPattern: [],
+      sound:       null,
+    });
   }
 
   return true;
+};
+
+// ── Gentle evening reflection, delivered before Night Shield quiet hours ──────
+export const scheduleMoonNote = async () => {
+  const notificationsEnabled = await initNotifications();
+  if (!notificationsEnabled) return false;
+
+  await cancelMoonNote();
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: '🌙 Your Moon Note',
+      body:  'Before the day ends, name one small thing you did well. Let that be enough.',
+      data:  { type: 'moon-note' },
+      sound: false,
+      ...(Platform.OS === 'android'
+        ? {
+            channelId: 'sanl-night-note',
+            priority: 'low',
+            vibrationPattern: [],
+          }
+        : { interruptionLevel: 'passive' }),
+    },
+    trigger: {
+      hour:    21,
+      minute:  30,
+      repeats: true,
+    },
+  });
+
+  return true;
+};
+
+export const cancelMoonNote = async () => {
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  for (const notification of scheduled) {
+    if (notification.content.data?.type === 'moon-note') {
+      await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+    }
+  }
 };
 
 // ── Schedule daily 9AM motivation notification ────────────────────────────────
@@ -112,13 +151,22 @@ export const notifyStreakMilestone = async (streak) => {
 
 // ── Night Shield reminder ─────────────────────────────────────────────────────
 export const notifyNightShieldActive = async () => {
+  const notificationsEnabled = await initNotifications();
+  if (!notificationsEnabled) return;
+
   await Notifications.scheduleNotificationAsync({
     content: {
       title: '🌙 Night Shield Active',
       body:  "10PM–6AM: Protected apps are locked. Rest. You've got this.",
       data:  { type: 'night-shield' },
       sound: false,
-      ...(Platform.OS === 'android' ? { channelId: 'sanl-main' } : {}),
+      ...(Platform.OS === 'android'
+        ? {
+            channelId: 'sanl-night-note',
+            priority: 'low',
+            vibrationPattern: [],
+          }
+        : { interruptionLevel: 'passive' }),
     },
     trigger: null,
   });

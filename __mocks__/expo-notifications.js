@@ -11,6 +11,7 @@ module.exports = {
   addNotificationReceivedListener:           jest.fn().mockReturnValue({ remove: jest.fn() }),
   addNotificationResponseReceivedListener:   jest.fn().mockReturnValue({ remove: jest.fn() }),
   AndroidImportance: {
+    LOW:     2,
     DEFAULT: 3,
     HIGH:    4,
     MAX:     5,

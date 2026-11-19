@@ -24,6 +24,8 @@ const router = express.Router();
 // ── Constants ─────────────────────────────────────────────────────────────────
 const GEMINI_URL     =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent';
+const FALLBACK_GEMINI_URL =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent';
 
 const DEFAULT_GENERATION_CONFIG = {
   temperature:     0.85,
@@ -56,7 +58,7 @@ const proxyToGemini = async (req, res, next) => {
   }
 
   try {
-    const upstream = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, {
+    const requestOptions = {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -64,9 +66,18 @@ const proxyToGemini = async (req, res, next) => {
         generationConfig: { ...DEFAULT_GENERATION_CONFIG, ...generationConfig },
         safetySettings:   safetySettings || DEFAULT_SAFETY_SETTINGS,
       }),
-    });
+    };
 
-    const data = await upstream.json();
+    let upstream = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, requestOptions);
+    let data = await upstream.json();
+
+    if (upstream.status === 503) {
+      upstream = await fetch(
+        `${FALLBACK_GEMINI_URL}?key=${encodeURIComponent(apiKey)}`,
+        requestOptions
+      );
+      data = await upstream.json();
+    }
 
     // ── Only 200 → cached by redisCache middleware via patched res.json ────────
     if (upstream.status === 200) {

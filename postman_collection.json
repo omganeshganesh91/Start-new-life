@@ -1,0 +1,67 @@
+﻿{
+  "info": {
+    "_postman_id": "1b6e2b42-3e4a-4ebd-a2ae-8b4fc7cd1110",
+    "name": "Start A New Life API",
+    "description": "Postman collection for the Start A New Life Express backend. Set baseUrl and anonId in collection variables. Start the backend with: cd backend && npm start",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000", "type": "string" },
+    { "key": "anonId", "value": "postman-user-001", "type": "string" },
+    { "key": "pledgeId", "value": "replace-with-pledge-id", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET Health",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/health" }
+        }
+      ]
+    },
+    {
+      "name": "n",
+      "item": [
+        {
+          "name": "GET List pledges",
+          "request": { "method": "GET", "header": [{ "key": "x-anon-id", "value": "{{anonId}}" }], "url": { "raw": "{{baseUrl}}/api/pledges?limit=20&offset=0", "host": ["{{baseUrl}}"], "path": ["api", "pledges"], "query": [{ "key": "limit", "value": "20" }, { "key": "offset", "value": "0" }] } }
+        },
+        {
+          "name": "POST Create pledge",
+          "request": { "method": "POST", "header": [{ "key": "x-anon-id", "value": "{{anonId}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"message\": \"Day 1. I choose freedom.\",\n  \"streak\": 1,\n  \"displayName\": \"BraveWarrior42\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/pledges" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) {", "  const body = pm.response.json();", "  if (body.id) pm.collectionVariables.set('pledgeId', body.id);", "}"] } }]
+        },
+        {
+          "name": "POST Toggle pledge heart",
+          "request": { "method": "POST", "header": [{ "key": "x-anon-id", "value": "{{anonId}}" }], "url": "{{baseUrl}}/api/pledges/{{pledgeId}}/heart" }
+        },
+        {
+          "name": "DELETE Own pledge",
+          "request": { "method": "DELETE", "header": [{ "key": "x-anon-id", "value": "{{anonId}}" }], "url": "{{baseUrl}}/api/pledges/{{pledgeId}}" }
+        }
+      ]
+    },
+    {
+      "name": "Gemini",
+      "item": [
+        {
+          "name": "POST Motivation",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"prompt\": \"Give me a short, compassionate encouragement to stay focused on recovery today.\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/gemini/motivation" }
+        },
+        {
+          "name": "POST Trigger analysis",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"prompt\": \"Help me identify patterns in these triggers and suggest practical coping steps: [describe triggers]\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/gemini/triggers" }
+        },
+        {
+          "name": "POST Vision affirmation",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"prompt\": \"Write a concise positive affirmation for this future I am working toward: [describe vision]\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/gemini/vision" }
+        },
+        {
+          "name": "POST Generate (generic prompt)",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"prompt\": \"Give me a short encouragement.\",\n  \"generationConfig\": {\n    \"temperature\": 0.85,\n    \"maxOutputTokens\": 300\n  }\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/gemini/generate" }
+        }
+      ]
+    }
+  ]
+}

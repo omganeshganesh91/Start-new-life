@@ -103,6 +103,7 @@ export const STORAGE_KEYS = {
   anonymousId:         '@sanl_anon_id',
   pinHash:             '@sanl_pin_hash',
   pinSet:              '@sanl_pin_set',
+  moonNoteEnabled:     '@sanl_moon_note_enabled',
 };
 
 // ── Legacy aliases (kept for back-compat with old code) ───────────────────────
