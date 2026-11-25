@@ -10,6 +10,17 @@ import { GEMINI_PROMPTS } from '../utils/constants';
 // e.g. http://localhost:5000  or  https://your-app.railway.app
 const API_BASE = (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000').replace(/\/$/, '');
 
+export const fetchMotivationQuotes = async ({ offset = 0, limit = 30 } = {}) => {
+  const response = await fetch(`${API_BASE}/api/quotes?offset=${offset}&limit=${limit}`);
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error?.error || `Quotes API HTTP ${response.status}`);
+  }
+  const data = await response.json();
+  if (!Array.isArray(data?.quotes)) throw new Error('Quotes API returned an invalid quote page');
+  return data;
+};
+
 // ── Core fetch — calls the backend proxy ─────────────────────────────────────
 const callGemini = async (prompt, endpoint = 'generate') => {
   const startedAt = Date.now();

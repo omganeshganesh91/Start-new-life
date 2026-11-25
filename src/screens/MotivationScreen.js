@@ -3,14 +3,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView,
+  View, Text, StyleSheet, FlatList, ActivityIndicator,
   TouchableOpacity, Modal, Linking, Alert,
 } from 'react-native';
-import { useSelector, useDispatch } from 'react-redux';
-import MotivationCard    from '../components/MotivationCard';
+import { useDispatch } from 'react-redux';
 import GroundingExercise from '../components/GroundingExercise';
 import FutureLetter      from '../components/FutureLetter';
-import { fetchMotivation } from '../store/motivationSlice';
+import { fetchMotivationQuotes } from '../services/GeminiService';
 import { addCoins }        from '../store/coinsSlice';
 import { COLORS, FONTS, SPACING, RADIUS, COIN_REWARDS } from '../utils/constants';
 
@@ -22,13 +21,40 @@ const TABS = [
 
 const MotivationScreen = () => {
   const dispatch    = useDispatch();
-  const motivation  = useSelector((s) => s.motivation);
   const [activeTab, setActiveTab]       = useState('motivation');
   const [groundingModal, setGroundingModal] = useState(false);
+  const [quotes, setQuotes] = useState([]);
+  const [quoteTotal, setQuoteTotal] = useState(0);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState('');
+  const quoteOffset = React.useRef(0);
+  const quoteHasMore = React.useRef(true);
+  const quoteRequestInFlight = React.useRef(false);
+  const PAGE_SIZE = 30;
 
   useEffect(() => {
-    dispatch(fetchMotivation());
+    loadQuotes(true);
   }, []);
+
+  const loadQuotes = async (reset = false) => {
+    if (quoteRequestInFlight.current || (!reset && !quoteHasMore.current)) return;
+    quoteRequestInFlight.current = true;
+    setQuoteLoading(true);
+    setQuoteError('');
+    const offset = reset ? 0 : quoteOffset.current;
+    try {
+      const page = await fetchMotivationQuotes({ offset, limit: PAGE_SIZE });
+      setQuotes((current) => reset ? page.quotes : [...current, ...page.quotes]);
+      quoteOffset.current = offset + page.quotes.length;
+      quoteHasMore.current = page.hasMore;
+      setQuoteTotal(page.total);
+    } catch (error) {
+      setQuoteError(error.message || 'Could not load quotes.');
+    } finally {
+      quoteRequestInFlight.current = false;
+      setQuoteLoading(false);
+    }
+  };
 
   const handleGroundingComplete = () => {
     setGroundingModal(false);
@@ -65,7 +91,15 @@ const MotivationScreen = () => {
 
       {/* Tab Content */}
       {activeTab === 'motivation' && (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        <FlatList
+          data={quotes}
+          keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scroll}
+          onEndReached={() => loadQuotes()}
+          onEndReachedThreshold={0.6}
+          ListHeaderComponent={(
+            <>
           {/* SOS Urge Button */}
           <TouchableOpacity
             style={styles.urgeSOS}
@@ -79,17 +113,25 @@ const MotivationScreen = () => {
             </View>
           </TouchableOpacity>
 
-          <MotivationCard
-            quote={motivation.quote}
-            explanation={motivation.explanation}
-            action={motivation.action}
-            imageUrl={motivation.imageUrl}
-            loading={motivation.loading}
-            onRefresh={() => {
-              dispatch(fetchMotivation());
-              handleMotivationRead();
-            }}
-          />
+            <Text style={styles.quoteCount}>Showing {quotes.length} of {quoteTotal || '...'} quotes</Text>
+            {quoteError ? (
+              <TouchableOpacity onPress={() => loadQuotes(quotes.length === 0)} style={styles.quoteError}>
+                <Text style={styles.quoteErrorText}>{quoteError}  Tap to retry</Text>
+              </TouchableOpacity>
+            ) : null}
+            </>
+          )}
+          renderItem={({ item, index }) => (
+            <TouchableOpacity activeOpacity={0.9} onPress={handleMotivationRead} style={styles.quoteRow}>
+              <Text style={styles.quoteNumber}>#{index + 1}  ·  {item.category}</Text>
+              <Text style={styles.quoteText}>“{item.quote}”</Text>
+            </TouchableOpacity>
+          )}
+          ListEmptyComponent={!quoteLoading && !quoteError ? <Text style={styles.emptyQuotes}>No quotes are available yet.</Text> : null}
+          ListFooterComponent={(
+            <>
+              {quoteLoading ? <ActivityIndicator style={styles.quoteSpinner} color={COLORS.primaryLight} /> : null}
+              {!quoteHasMore.current && quotes.length > 0 ? <Text style={styles.endOfQuotes}>You’ve reached the end of the quote library.</Text> : null}
 
           {/* Urge Playlist */}
           <View style={styles.urgePlaylist}>
@@ -113,7 +155,9 @@ const MotivationScreen = () => {
           </View>
 
           <View style={{ height: SPACING.xxl }} />
-        </ScrollView>
+            </>
+          )}
+        />
       )}
 
       {activeTab === 'grounding' && (
@@ -192,6 +236,15 @@ const styles = StyleSheet.create({
   scroll: {
     paddingBottom: SPACING.xl,
   },
+  quoteCount: { color: COLORS.textMuted, fontSize: FONTS.sizes.xs, marginHorizontal: SPACING.md, marginTop: SPACING.sm },
+  quoteRow: { marginHorizontal: SPACING.md, marginTop: SPACING.sm, padding: SPACING.md, borderRadius: RADIUS.lg, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border },
+  quoteNumber: { color: COLORS.primaryLight, fontSize: FONTS.sizes.xs, marginBottom: SPACING.xs, textTransform: 'capitalize' },
+  quoteText: { color: COLORS.textPrimary, fontSize: FONTS.sizes.md, lineHeight: 24, fontWeight: FONTS.weights.medium },
+  quoteError: { margin: SPACING.md, padding: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.accentRed + '20' },
+  quoteErrorText: { color: COLORS.textPrimary, fontSize: FONTS.sizes.sm },
+  quoteSpinner: { margin: SPACING.lg },
+  emptyQuotes: { color: COLORS.textMuted, textAlign: 'center', margin: SPACING.lg },
+  endOfQuotes: { color: COLORS.textMuted, textAlign: 'center', margin: SPACING.md, fontSize: FONTS.sizes.xs },
   urgeSOS: {
     flexDirection:    'row',
     alignItems:       'center',
